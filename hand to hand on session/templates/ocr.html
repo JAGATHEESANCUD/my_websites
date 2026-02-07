@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image to Text - OCR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .ocr-main {
+            margin-top: 20px;
+        }
+
+        .ocr-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .ocr-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.2);
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            border-radius: 8px;
+            color: #166534;
+            margin-bottom: 15px;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #991b1b;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+
+    <div class="nav-links">
+        <a href="/">📊 Dashboard</a>
+        <a href="/ocr">🖼️ Image to Text (OCR)</a>
+        <a href="/files">📂 View All Files</a>
+    </div>
+
+    <h1>🖼️ Convert Image to Text (OCR)</h1>
+
+    <div class="ocr-main">
+        <div class="ocr-grid">
+
+            <!-- LEFT: Upload Section -->
+            <div class="ocr-container">
+                <h2>Upload Image</h2>
+                <form method="POST" enctype="multipart/form-data" id="ocrForm">
+                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                        <div style="font-size: 48px; margin-bottom: 15px;">📁</div>
+                        <p style="font-size: 18px; color: #333; margin: 0 0 10px 0;">Drag image here or click to upload</p>
+                        <input type="file" name="image" id="imageInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                        <button type="button" onclick="document.getElementById('imageInput').click()" class="btn-secondary" style="width: auto; padding: 10px 24px; display: inline-block;">Choose File</button>
+                    </div>
+
+                    <div id="imagePreviewContainer"></div>
+
+                    <button type="submit" id="submitBtn" style="display: none;">Extract Text</button>
+                </form>
+            </div>
+
+            <!-- RIGHT: Results Section -->
+            <div class="ocr-container">
+                <h2>Extracted Text</h2>
+
+                {% if extracted_text %}
+                    {% if extracted_text.startswith('Error') %}
+                        <div class="error-message">
+                            <strong>❌ Error:</strong> {{ extracted_text }}
+                        </div>
+                    {% else %}
+                        <div class="success-message">
+                            <strong>✅ Success!</strong> Text extracted from {{ filename }}
+                        </div>
+
+                        <div class="text-output">
+                            {{ extracted_text }}
+                        </div>
+
+                        <button class="copy-btn" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+                        <button class="copy-btn" onclick="downloadText()" style="background: linear-gradient(135deg, #f59e0b, #d97706); margin-top: 10px;">⬇️ Download as Text</button>
+                    {% endif %}
+                {% else %}
+                    <p style="color: #888; text-align: center; padding: 40px 20px;">
+                        📸 No text extracted yet.<br>
+                        Upload an image to get started!
+                    </p>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Drag and drop functionality
+    function handleDragOver(e) {
+        e.preventDefault();
+        document.getElementById('uploadArea').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+        document.getElementById('uploadArea').classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        document.getElementById('uploadArea').classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            document.getElementById('imageInput').files = files;
+            handleFileSelect({ target: { files: files } });
+        }
+    }
+
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const previewContainer = document.getElementById('imagePreviewContainer');
+                previewContainer.innerHTML = `
+                    <div style="margin-top: 20px; text-align: center;">
+                        <img src="${event.target.result}" class="image-preview" alt="preview">
+                        <p style="color: #666; margin-top: 10px; font-size: 14px;">${file.name}</p>
+                    </div>
+                `;
+                document.getElementById('submitBtn').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            alert('Please select a valid image file.');
+        }
+    }
+
+    function copyToClipboard() {
+        const textOutput = document.querySelector('.text-output');
+        if (textOutput) {
+            const text = textOutput.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Text copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+    }
+
+    function downloadText() {
+        const textOutput = document.querySelector('.text-output');
+        if (textOutput) {
+            const text = textOutput.innerText;
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', 'extracted-text.txt');
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+    }
+</script>
+
+</body>
+</html>
